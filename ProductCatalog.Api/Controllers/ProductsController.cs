@@ -196,9 +196,6 @@ public class ProductsController : ControllerBase
         return Ok(MapToDto(updatedProduct));
     }
 
-    /// <summary>
-    /// DELETE /api/products/{id} - Delete a product
-    /// </summary>
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteProduct(int id)
     {

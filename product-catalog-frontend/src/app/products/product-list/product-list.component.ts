@@ -1,23 +1,48 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { ProductService } from '../../services/product.service';
 import { CategoryService } from '../../services/category.service';
+import { ToastService } from '../../services/toast.service';
 import { Product } from '../../models/product.interface';
 import { Category } from '../../models/category.interface';
 import { ProductFormComponent } from '../product-form/product-form.component';
 import { ModalComponent } from '../../shared/modal/modal.component';
+import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
+import { LoadingSpinnerComponent } from '../../shared/loading-spinner/loading-spinner.component';
+import { ToastComponent } from '../../shared/toast/toast.component';
 
 @Component({
   selector: 'app-product-list',
   standalone: true,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, ProductFormComponent, ModalComponent],
+  imports: [
+    CommonModule,
+    RouterModule,
+    ReactiveFormsModule,
+    ProductFormComponent,
+    ModalComponent,
+    ConfirmDialogComponent,
+    LoadingSpinnerComponent,
+    ToastComponent
+  ],
   template: `
     <div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2>Products</h2>
-        <button class="btn btn-primary" (click)="openAddModal()">Add New Product</button>
+      <app-toast 
+        [message]="(toastService.toast$ | async)?.message || null"
+        [type]="(toastService.toast$ | async)?.type || 'info'">
+      </app-toast>
+
+      <div class="page-header">
+        <h2 class="page-title">Products</h2>
+        <button 
+          class="btn btn-primary" 
+          (click)="openAddModal()"
+          aria-label="Add new product">
+          Add New Product
+        </button>
       </div>
 
       <!-- Product Form Modal -->
@@ -33,80 +58,157 @@ import { ModalComponent } from '../../shared/modal/modal.component';
         </app-product-form>
       </app-modal>
 
-      <form [formGroup]="searchForm" (ngSubmit)="onSearch()" style="margin-bottom: 20px;">
-        <div style="display: flex; gap: 10px;">
-          <input 
-            type="text" 
-            formControlName="search" 
-            placeholder="Search products..."
-            style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-          <select formControlName="categoryId" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-            <option [value]="null">All Categories</option>
-            <option *ngFor="let category of categories" [value]="category.id">{{ category.name }}</option>
-          </select>
-          <button type="submit" class="btn btn-primary">Search</button>
-          <button type="button" class="btn btn-secondary" (click)="clearSearch()">Clear</button>
-        </div>
+      <!-- Delete Confirmation Modal -->
+      <app-confirm-dialog
+        [isOpen]="showDeleteConfirm"
+        title="Delete Product"
+        [message]="deleteConfirmMessage"
+        confirmText="Delete"
+        (confirmed)="confirmDelete()"
+        (cancelled)="cancelDelete()">
+      </app-confirm-dialog>
+
+      <form [formGroup]="searchForm" (ngSubmit)="onSearch()" class="search-form" role="search" aria-label="Product search">
+        <input 
+          type="text" 
+          formControlName="search" 
+          placeholder="Search products by name or description..."
+          class="search-input"
+          aria-label="Search products">
+        <select 
+          formControlName="categoryId" 
+          class="filter-select"
+          aria-label="Filter by category"
+          (change)="onCategoryChange()">
+          <option [value]="null">All Categories</option>
+          <option *ngFor="let category of categories" [value]="category.id">
+            {{ category.name }}
+          </option>
+        </select>
+        <button type="submit" class="btn btn-primary" aria-label="Search">Search</button>
+        <button 
+          type="button" 
+          class="btn btn-secondary" 
+          (click)="clearSearch()"
+          aria-label="Clear search filters">
+          Clear
+        </button>
       </form>
 
-      <div *ngIf="loading" class="loading">Loading...</div>
-      <div *ngIf="error" class="error">{{ error }}</div>
+      <div *ngIf="loading">
+        <app-loading-spinner message="Loading products..."></app-loading-spinner>
+      </div>
+
+      <div *ngIf="error" class="error" role="alert">
+        <strong>Error:</strong> {{ error }}
+      </div>
 
       <div *ngIf="!loading && !error">
-        <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 4px; overflow: hidden;">
-          <thead>
-            <tr style="background-color: #007bff; color: white;">
-              <th style="padding: 12px; text-align: left;">Name</th>
-              <th style="padding: 12px; text-align: left;">SKU</th>
-              <th style="padding: 12px; text-align: right;">Price</th>
-              <th style="padding: 12px; text-align: right;">Quantity</th>
-              <th style="padding: 12px; text-align: left;">Category</th>
-              <th style="padding: 12px; text-align: center;">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let product of products" style="border-bottom: 1px solid #ddd;">
-              <td style="padding: 12px;">{{ product.name }}</td>
-              <td style="padding: 12px;">{{ product.sku }}</td>
-              <td style="padding: 12px; text-align: right;">{{ formatPrice(product.price) }}</td>
-              <td style="padding: 12px; text-align: right;">{{ product.quantity }}</td>
-              <td style="padding: 12px;">{{ getCategoryName(product.categoryId) }}</td>
-              <td style="padding: 12px; text-align: center;">
-                <button class="btn btn-secondary" (click)="editProduct(product.id)" style="margin-right: 5px;">Edit</button>
-                <button class="btn btn-danger" (click)="deleteProduct(product)">Delete</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div *ngIf="products.length > 0" class="table-container">
+          <table class="table" role="table" aria-label="Products list">
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">SKU</th>
+                <th scope="col" class="text-right">Price</th>
+                <th scope="col" class="text-right">Quantity</th>
+                <th scope="col">Category</th>
+                <th scope="col" class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let product of products">
+                <td>{{ product.name }}</td>
+                <td>{{ product.sku }}</td>
+                <td class="text-right">{{ formatPrice(product.price) }}</td>
+                <td class="text-right">
+                  <span [class.text-danger]="product.quantity === 0" [class.text-warning]="product.quantity > 0 && product.quantity < 10">
+                    {{ product.quantity }}
+                  </span>
+                </td>
+                <td>{{ getCategoryName(product.categoryId) }}</td>
+                <td class="text-center">
+                  <button 
+                    class="btn btn-secondary" 
+                    (click)="editProduct(product.id)"
+                    [attr.aria-label]="'Edit ' + product.name"
+                    style="margin-right: 5px;">
+                    Edit
+                  </button>
+                  <button 
+                    class="btn btn-danger" 
+                    (click)="deleteProduct(product)"
+                    [attr.aria-label]="'Delete ' + product.name">
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-        <div *ngIf="products.length === 0" style="text-align: center; padding: 40px; background: white; border-radius: 4px; margin-top: 20px;">
-          No products found.
+        <div *ngIf="products.length === 0" class="empty-state">
+          <div class="empty-state-icon">📦</div>
+          <h3 class="empty-state-title">No products found</h3>
+          <p class="empty-state-message">
+            <span *ngIf="hasActiveFilters()">
+              Try adjusting your search or filter criteria.
+            </span>
+            <span *ngIf="!hasActiveFilters()">
+              Get started by adding your first product.
+            </span>
+          </p>
+          <button 
+            *ngIf="!hasActiveFilters()"
+            class="btn btn-primary" 
+            (click)="openAddModal()"
+            style="margin-top: 16px;">
+            Add Your First Product
+          </button>
         </div>
       </div>
     </div>
   `,
   styles: [`
-    table {
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    .text-right {
+      text-align: right;
     }
-    tbody tr:hover {
-      background-color: #f8f9fa;
+
+    .text-center {
+      text-align: center;
+    }
+
+    .text-danger {
+      color: #dc3545;
+      font-weight: 600;
+    }
+
+    .text-warning {
+      color: #ffc107;
+      font-weight: 600;
     }
   `]
 })
-export class ProductListComponent implements OnInit {
+export class ProductListComponent implements OnInit, OnDestroy {
   products: Product[] = [];
   categories: Category[] = [];
   loading = false;
   error: string | null = null;
   searchForm: FormGroup;
   showProductModal = false;
+  showDeleteConfirm = false;
   editingProductId: number | null = null;
   editingProduct: Product | null = null;
+  productToDelete: Product | null = null;
+  deleteConfirmMessage = '';
+
+  private destroy$ = new Subject<void>();
+  private searchSubject = new Subject<string>();
 
   constructor(
     private productService: ProductService,
     private categoryService: CategoryService,
+    public toastService: ToastService,
     private router: Router,
     private fb: FormBuilder
   ) {
@@ -119,6 +221,24 @@ export class ProductListComponent implements OnInit {
   ngOnInit(): void {
     this.loadCategories();
     this.loadProducts();
+
+    // Debounced search
+    this.searchForm.get('search')?.valueChanges
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged(),
+        takeUntil(this.destroy$)
+      )
+      .subscribe(() => {
+        if (!this.loading) {
+          this.loadProducts();
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   loadProducts(): void {
@@ -137,6 +257,7 @@ export class ProductListComponent implements OnInit {
       error: (err) => {
         this.error = 'Failed to load products. Please check if the API is running.';
         this.loading = false;
+        this.toastService.error('Failed to load products');
         console.error(err);
       }
     });
@@ -149,6 +270,7 @@ export class ProductListComponent implements OnInit {
       },
       error: (err) => {
         console.error('Failed to load categories', err);
+        this.toastService.error('Failed to load categories');
       }
     });
   }
@@ -157,9 +279,18 @@ export class ProductListComponent implements OnInit {
     this.loadProducts();
   }
 
+  onCategoryChange(): void {
+    this.loadProducts();
+  }
+
   clearSearch(): void {
     this.searchForm.reset();
     this.loadProducts();
+  }
+
+  hasActiveFilters(): boolean {
+    const formValue = this.searchForm.value;
+    return !!(formValue.search || formValue.categoryId);
   }
 
   openAddModal(): void {
@@ -183,20 +314,36 @@ export class ProductListComponent implements OnInit {
   onProductSaved(): void {
     this.closeProductModal();
     this.loadProducts();
+    this.toastService.success('Product saved successfully!');
   }
 
   deleteProduct(product: Product): void {
-    if (confirm(`Are you sure you want to delete "${product.name}"?`)) {
-      this.productService.deleteProduct(product.id).subscribe({
-        next: () => {
-          this.loadProducts();
-        },
-        error: (err) => {
-          this.error = 'Failed to delete product';
-          console.error(err);
-        }
-      });
-    }
+    this.productToDelete = product;
+    this.deleteConfirmMessage = `Are you sure you want to delete "${product.name}"? This action cannot be undone.`;
+    this.showDeleteConfirm = true;
+  }
+
+  confirmDelete(): void {
+    if (!this.productToDelete) return;
+
+    this.productService.deleteProduct(this.productToDelete.id).subscribe({
+      next: () => {
+        this.toastService.success(`Product "${this.productToDelete!.name}" deleted successfully`);
+        this.loadProducts();
+        this.productToDelete = null;
+      },
+      error: (err) => {
+        this.error = 'Failed to delete product';
+        this.toastService.error('Failed to delete product');
+        console.error(err);
+        this.productToDelete = null;
+      }
+    });
+  }
+
+  cancelDelete(): void {
+    this.productToDelete = null;
+    this.showDeleteConfirm = false;
   }
 
   getCategoryName(categoryId: number | null | undefined): string {

@@ -77,37 +77,20 @@ product-catalog-system/
 - `GET /api/categories/tree` - Get categories as hierarchical tree
 - `POST /api/categories` - Create a new category
 
-## Features Implemented
+## Features
 
-### Backend (C#)
+### Backend
+- Repository pattern with EF Core and in-memory implementations
+- Product search with fuzzy matching
+- Category tree structure
+- JWT authentication
+- Custom middleware and caching
 
-- Custom `Repository<T>` base class using generics and interfaces  
-- In-memory repository implementation (`InMemoryProductRepository`) using pure collections  
-- Custom LINQ extension methods for product filtering  
-- Record types for DTOs  
-- Pattern matching for request validation  
-- Nullable reference types throughout  
-- Custom middleware (`RequestLoggingMiddleware`) built from scratch  
-- Caching layer using `Dictionary<TKey, TValue>` for search results  
-- Hierarchical category tree structure  
-- `IComparable` implementation for Product model  
-- Manual model binding in PUT endpoint  
-- Custom JSON serialization (`ProductJsonConverter`)  
-- Dependency Injection for `ProductSearchEngine`  
-- `ProductSearchEngine` with fuzzy matching and weighted scoring (using only .NET BCL)
-
-### Frontend (Angular)
-
-- Standalone components (Angular 17+)  
-- TypeScript interfaces for all data models  
-- Reactive forms with validation  
-- Error handling and user feedback  
-- RxJS for API calls  
-- Unit tests for services  
-- Product listing with search and category filter  
-- Add/Edit product form  
-- Delete product with confirmation  
-- Category management with tree view
+### Frontend
+- Angular standalone components
+- Product and category management
+- Search and filtering
+- Form validation
 
 ## Testing
 
@@ -171,9 +154,8 @@ docker run -p 4200:80 product-catalog-frontend
 
 ## Authentication
 
-The API now includes JWT authentication:
+JWT authentication is implemented. Login endpoint accepts any username/password for demo purposes.
 
-1. **Login**:
 ```bash
 POST /api/auth/login
 {
@@ -182,40 +164,17 @@ POST /api/auth/login
 }
 ```
 
-2. **Use Token**:
-Include the token in the Authorization header:
+Include the token in requests:
 ```
 Authorization: Bearer {token}
 ```
 
-**Note**: Currently uses demo authentication (accepts any username/password). See `OPTIONAL_FEATURES.md` for details.
-
-## Key Technical Highlights
-
-1. **ProductSearchEngine**: A generic search engine using only .NET Base Class Library with:
-   - Fuzzy matching using Levenshtein distance
-   - Weighted multi-field search
-   - Configurable field extractors and weights
-
-2. **Repository Pattern**: Two implementations:
-   - EF Core-based `Repository<T>` for standard database operations
-   - `InMemoryProductRepository` using pure collections (List, Dictionary)
-
-3. **Custom Middleware**: Request logging middleware built from scratch without framework helpers
-
-4. **Caching**: Simple in-memory cache using Dictionary with expiration support
-
-5. **Category Tree**: Hierarchical category structure with recursive tree building
-
 ## Notes
 
-- The backend uses Entity Framework Core with an in-memory database for simplicity
-- CORS is configured to allow requests from `http://localhost:4200`
-- The application includes seed data for initial testing
-- All code follows nullable reference type patterns
-- JWT authentication is implemented (see `OPTIONAL_FEATURES.md`)
-- Docker support is included for easy deployment
-- Comprehensive unit and integration tests are available
+- Backend uses Entity Framework Core with an in-memory database
+- CORS configured for `http://localhost:4200`
+- Seed data included for testing
+- JWT authentication implemented
 
 ## Troubleshooting
 

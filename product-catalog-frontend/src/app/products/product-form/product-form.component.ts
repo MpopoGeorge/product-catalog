@@ -4,6 +4,7 @@ import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ProductService } from '../../services/product.service';
 import { CategoryService } from '../../services/category.service';
+import { ToastService } from '../../services/toast.service';
 import { Category } from '../../models/category.interface';
 
 @Component({
@@ -15,59 +16,129 @@ import { Category } from '../../models/category.interface';
       <div *ngIf="error" class="error">{{ error }}</div>
       <div *ngIf="successMessage" class="success">{{ successMessage }}</div>
 
-      <form [formGroup]="productForm" (ngSubmit)="onSubmit()" id="productForm">
+      <form [formGroup]="productForm" (ngSubmit)="onSubmit()" id="productForm" aria-label="Product form">
         <div class="form-group">
-          <label for="name">Name *</label>
-          <input id="name" type="text" formControlName="name" />
-          <div *ngIf="productForm.get('name')?.invalid && productForm.get('name')?.touched" class="error-message">
+          <label for="name">Name <span aria-label="required">*</span></label>
+          <input 
+            id="name" 
+            type="text" 
+            formControlName="name"
+            aria-required="true"
+            [attr.aria-invalid]="productForm.get('name')?.invalid && productForm.get('name')?.touched"
+            aria-describedby="name-error" />
+          <div 
+            *ngIf="productForm.get('name')?.invalid && productForm.get('name')?.touched" 
+            class="error-message"
+            id="name-error"
+            role="alert">
             Name is required
           </div>
         </div>
 
         <div class="form-group">
           <label for="description">Description</label>
-          <textarea id="description" formControlName="description"></textarea>
+          <textarea 
+            id="description" 
+            formControlName="description"
+            aria-describedby="description-help">
+          </textarea>
+          <small id="description-help" class="sr-only">Optional product description</small>
         </div>
 
         <div class="form-group">
-          <label for="sku">SKU *</label>
-          <input id="sku" type="text" formControlName="sku" />
-          <div *ngIf="productForm.get('sku')?.invalid && productForm.get('sku')?.touched" class="error-message">
+          <label for="sku">SKU <span aria-label="required">*</span></label>
+          <input 
+            id="sku" 
+            type="text" 
+            formControlName="sku"
+            aria-required="true"
+            [attr.aria-invalid]="productForm.get('sku')?.invalid && productForm.get('sku')?.touched"
+            aria-describedby="sku-error" />
+          <div 
+            *ngIf="productForm.get('sku')?.invalid && productForm.get('sku')?.touched" 
+            class="error-message"
+            id="sku-error"
+            role="alert">
             SKU is required
           </div>
         </div>
 
         <div class="form-group">
-          <label for="price">Price *</label>
-          <input id="price" type="number" formControlName="price" step="0.01" min="0" />
-          <div *ngIf="productForm.get('price')?.invalid && productForm.get('price')?.touched" class="error-message">
+          <label for="price">Price <span aria-label="required">*</span></label>
+          <input 
+            id="price" 
+            type="number" 
+            formControlName="price" 
+            step="0.01" 
+            min="0"
+            aria-required="true"
+            [attr.aria-invalid]="productForm.get('price')?.invalid && productForm.get('price')?.touched"
+            aria-describedby="price-error" />
+          <div 
+            *ngIf="productForm.get('price')?.invalid && productForm.get('price')?.touched" 
+            class="error-message"
+            id="price-error"
+            role="alert">
             Price must be greater than 0
           </div>
         </div>
 
         <div class="form-group">
-          <label for="quantity">Quantity *</label>
-          <input id="quantity" type="number" formControlName="quantity" min="0" />
-          <div *ngIf="productForm.get('quantity')?.invalid && productForm.get('quantity')?.touched" class="error-message">
+          <label for="quantity">Quantity <span aria-label="required">*</span></label>
+          <input 
+            id="quantity" 
+            type="number" 
+            formControlName="quantity" 
+            min="0"
+            aria-required="true"
+            [attr.aria-invalid]="productForm.get('quantity')?.invalid && productForm.get('quantity')?.touched"
+            aria-describedby="quantity-error" />
+          <div 
+            *ngIf="productForm.get('quantity')?.invalid && productForm.get('quantity')?.touched" 
+            class="error-message"
+            id="quantity-error"
+            role="alert">
             Quantity cannot be negative
           </div>
         </div>
 
         <div class="form-group">
           <label for="categoryId">Category</label>
-          <select id="categoryId" formControlName="categoryId">
+          <select 
+            id="categoryId" 
+            formControlName="categoryId"
+            aria-describedby="category-help">
             <option [value]="null">None</option>
-            <option *ngFor="let category of categories" [value]="category.id">{{ category.name }}</option>
+            <option *ngFor="let category of categories" [value]="category.id">
+              {{ category.name }}
+            </option>
           </select>
+          <small id="category-help" class="sr-only">Optional product category</small>
         </div>
 
       </form>
     </div>
     
-    <div footer>
-      <button type="button" class="btn btn-secondary" (click)="cancel()">Cancel</button>
-      <button type="submit" form="productForm" class="btn btn-primary" [disabled]="productForm.invalid || loading">
-        {{ loading ? 'Saving...' : (isEditMode ? 'Update' : 'Create') }}
+    <div class="modal-footer">
+      <button 
+        type="button" 
+        class="btn btn-secondary" 
+        (click)="cancel()"
+        aria-label="Cancel and close form">
+        Cancel
+      </button>
+      <button 
+        type="submit" 
+        form="productForm" 
+        class="btn btn-primary" 
+        [disabled]="productForm.invalid || loading"
+        [attr.aria-label]="isEditMode ? 'Update product' : 'Create product'">
+        <span *ngIf="loading">
+          <span aria-hidden="true">⏳</span> Saving...
+        </span>
+        <span *ngIf="!loading">
+          {{ isEditMode ? 'Update' : 'Create' }}
+        </span>
       </button>
     </div>
   `
@@ -88,6 +159,7 @@ export class ProductFormComponent implements OnInit {
     private fb: FormBuilder,
     private productService: ProductService,
     private categoryService: CategoryService,
+    private toastService: ToastService,
     private router: Router,
     private route: ActivatedRoute
   ) {
@@ -142,6 +214,7 @@ export class ProductFormComponent implements OnInit {
       },
       error: (err) => {
         this.error = 'Failed to load product';
+        this.toastService.error('Failed to load product');
         this.loading = false;
         console.error(err);
       }
@@ -176,7 +249,9 @@ export class ProductFormComponent implements OnInit {
 
     operation.subscribe({
       next: () => {
-        this.successMessage = this.isEditMode ? 'Product updated successfully!' : 'Product created successfully!';
+        const message = this.isEditMode ? 'Product updated successfully!' : 'Product created successfully!';
+        this.successMessage = message;
+        this.toastService.success(message);
         this.loading = false;
         setTimeout(() => {
           this.saved.emit();
@@ -187,7 +262,9 @@ export class ProductFormComponent implements OnInit {
         }, 500);
       },
       error: (err) => {
-        this.error = err.error?.message || 'Failed to save product';
+        const errorMsg = err.error?.message || 'Failed to save product';
+        this.error = errorMsg;
+        this.toastService.error(errorMsg);
         this.loading = false;
         console.error(err);
       }

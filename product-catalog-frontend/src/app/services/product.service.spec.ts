@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { ProductService } from './product.service';
 import { Product } from '../models/product.interface';
+import { API_BASE_URL } from '../app.config';
 
 describe('ProductService', () => {
   let service: ProductService;
@@ -44,7 +45,7 @@ describe('ProductService', () => {
       expect(products[0].name).toBe('Test Product');
     });
 
-    const req = httpMock.expectOne('http://localhost:5000/api/products?page=1&pageSize=20&ascending=true');
+    const req = httpMock.expectOne(`${API_BASE_URL}/api/products?page=1&pageSize=20&ascending=true`);
     expect(req.request.method).toBe('GET');
     req.flush(mockProducts);
   });
@@ -71,7 +72,7 @@ describe('ProductService', () => {
       expect(product.name).toBe('New Product');
     });
 
-    const req = httpMock.expectOne('http://localhost:5000/api/products');
+    const req = httpMock.expectOne(`${API_BASE_URL}/api/products`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual(newProduct);
     req.flush(createdProduct);
