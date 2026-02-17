@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ProductCatalog.Api/Dockerfile
+    container_name: product-catalog-api
+    ports:
+      - "5000:80"
+      - "5001:443"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - Jwt__SecretKey=YourSuperSecretKeyThatIsAtLeast32CharactersLong!
+      - Jwt__Issuer=ProductCatalogApi
+      - Jwt__Audience=ProductCatalogClient
+    networks:
+      - product-catalog-network
+
+  frontend:
+    build:
+      context: ./product-catalog-frontend
+      dockerfile: Dockerfile
+    container_name: product-catalog-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - api
+    networks:
+      - product-catalog-network
+
+networks:
+  product-catalog-network:
+    driver: bridge
